@@ -22,25 +22,27 @@ Notify.init({ timeout: 1500 });
 
 const lightbox = new SimpleLightbox('.gallery a');
 const imageApiService = new ImageApiService();
+let bottomReached = false;
 
 async function onSearch(e) {
   e.preventDefault();
 
-  refs.loaderTarget.classList.add('loader');
+  imageApiService.resetPage();
+  bottomReached = false;
+  showLoading();
 
   imageApiService.quvery = e.currentTarget.elements.searchQuery.value;
+  let inputValue = imageApiService.quvery.toLowerCase().trim();
 
-  if (imageApiService.quvery === '') {
+  if (inputValue === '') {
     Notify.info('Please, enter data');
+    hideLoading();
   } else {
     try {
-      await imageApiService.fetchArticles().then(hits => {
-        clearArticleContainer();
-        createArticleContainer(hits);
-        refs.loaderTarget.classList.remove('loader');
-      });
+      const backEndFiles = await imageApiService.fetchArticles();
 
-      imageApiService.resetPage();
+      clearArticleContainer();
+      createArticleContainer(backEndFiles);
 
       if (imageApiService.totalHits !== 0) {
         Notify.info(`Hooray! We found ${imageApiService.totalHits} images.`);
@@ -50,11 +52,10 @@ async function onSearch(e) {
         Notify.info(
           'Sorry, there are no images matching your search query. Please try again.'
         );
-        refs.btnLoadMore.classList.add('is-hidden');
+        hideLoading();
       }
 
       scrollTop();
-
       lightbox.refresh();
     } catch (error) {
       console.log(error);
@@ -63,17 +64,23 @@ async function onSearch(e) {
 }
 
 async function onLoadMore() {
-  refs.loaderTarget.classList.add('loader');
+  if (bottomReached) {
+    hideLoading();
+    return;
+  }
+  showLoading();
 
-  await imageApiService.fetchArticles().then(createArticleContainer);
+  const backEndFiles = await imageApiService.fetchArticles();
+  createArticleContainer(backEndFiles);
 
   lightbox.refresh();
 
   if (imageApiService.totalHits <= imageApiService.getNumELPage()) {
+    bottomReached = true;
     Notify.info(`We're sorry, but you've reached the end of search results.`);
+    hideLoading();
+    return;
   }
-
-  return;
 }
 function createGalleryCards(hits) {
   const markup = hits
@@ -137,4 +144,13 @@ function scrollTop() {
     top: cardTop - 100,
     behavior: 'smooth',
   });
+}
+function showLoading() {
+  // refs.btnLoadMore.classList.remove('is-hidden');
+  refs.loaderTarget.classList.add('loader');
+}
+
+function hideLoading() {
+  refs.btnLoadMore.classList.add('is-hidden');
+  refs.loaderTarget.classList.remove('loader');
 }
